@@ -401,7 +401,7 @@ int do_nice(message *m_ptr)
 			printf("nice allocate process with %d tickects\n",nice);
 		}
 
-		return lottery();
+		return OK;
 
 	}
 	else if (schedule_type==SCHEDULE_EDF)
@@ -423,6 +423,7 @@ int do_nice(message *m_ptr)
 
 		/* Update the proc entry and reschedule the process */
 		rmp->deadline=currentTime+nice;
+        printf("The Deadline is: %d",rmp->deadline);
 
 		if ((rv = schedule_process_local(rmp)) != OK)
 		{
@@ -435,7 +436,7 @@ int do_nice(message *m_ptr)
 			printf("nice allocate process with %d deadline\n",rmp->deadline);
 		}
 
-		return deadline();
+		return OK;
 
 	}
 	else
@@ -595,7 +596,7 @@ int deadline(void)
 				rmpMin = rmp;
 				continue;
 			}
-			if (min > rmp->deadline&&rmpMin->deadline!=-1)
+			if (min > rmp->deadline&&rmpMin->deadline>-1)
 			{
 				min = rmp->deadline;
 				rmpMin = rmp;
