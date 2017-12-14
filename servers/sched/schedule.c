@@ -345,7 +345,10 @@ int do_nice(message *m_ptr)
 			printf("Successfully switched from SCHEDULE_ORIGIN to SCHEDULE_LOTTERY!\n");
 			return OK;
 		}
-		new_q=nice_to_priority(nice, &maxprio);
+		if ((rv = nice_to_priority(nice, &new_q)) != OK)
+		{
+			return rv;
+		}
 		if (new_q >= NR_SCHED_QUEUES)
 		{
 			return EINVAL;
@@ -596,4 +599,18 @@ int deadline(void)
 	rmpMin->priority=USER_Q;
 	schedule_process_local(rmpMin);
 	return OK;
+}
+
+int nice_to_priority(int nice, unsigned* new_q)
+{
+	if (nice < PRIO_MIN || nice > PRIO_MAX) return(EINVAL);
+
+	*new_q = MAX_USER_Q + (nice-PRIO_MIN) * (MIN_USER_Q-MAX_USER_Q+1) /
+						  (PRIO_MAX-PRIO_MIN+1);
+
+	/* Neither of these should ever happen. */
+	if ((signed) *new_q < MAX_USER_Q) *new_q = MAX_USER_Q;
+	if (*new_q > MIN_USER_Q) *new_q = MIN_USER_Q;
+
+	return (OK);
 }
