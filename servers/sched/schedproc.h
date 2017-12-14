@@ -31,6 +31,7 @@ EXTERN struct schedproc {
 	unsigned time_slice;		/* this process's time slice */
 	unsigned cpu;		/* what CPU is the process running on */
 	unsigned ticketNum;
+	unsigned deadline;
 	bitchunk_t cpu_mask[BITMAP_CHUNKS(CONFIG_MAX_CPUS)]; /* what CPUs is hte
 								process allowed
 								to run on */
