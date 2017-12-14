@@ -63,7 +63,7 @@ static void pick_cpu(struct schedproc * proc)
 #ifdef CONFIG_SMP
 	unsigned cpu, c;
 	unsigned cpu_load = (unsigned) -1;
-	
+
 	if (machine.processors_count == 1) {
 		proc->cpu = machine.bsp_id;
 		return;
@@ -192,9 +192,9 @@ int do_start_scheduling(message *m_ptr)
 {
 	register struct schedproc *rmp;
 	int rv, proc_nr_n, parent_nr_n;
-	
+
 	/* we can handle two kinds of messages here */
-	assert(m_ptr->m_type == SCHEDULING_START || 
+	assert(m_ptr->m_type == SCHEDULING_START ||
 		m_ptr->m_type == SCHEDULING_INHERIT);
 
 	/* check who can send you requests */
@@ -238,12 +238,12 @@ int do_start_scheduling(message *m_ptr)
 		/* FIXME set the cpu mask */
 #endif
 	}
-	
+
 	switch (m_ptr->m_type) {
 
 	case SCHEDULING_START:
 		/* We have a special case here for system processes, for which
-		 * quanum and priority are set explicitly rather than inherited 
+		 * quanum and priority are set explicitly rather than inherited
 		 * from the parent */
 		if (schedule_type==SCHEDULE_ORIGIN)
             rmp->priority=rmp->max_priority;
@@ -255,7 +255,7 @@ int do_start_scheduling(message *m_ptr)
             assert(0);
 		rmp->time_slice = (unsigned) m_ptr->SCHEDULING_QUANTUM;
 		break;
-		
+
 	case SCHEDULING_INHERIT:
 		/* Inherit current priority and time slice from parent. Since there
 		 * is currently only one scheduler scheduling the whole system, this
@@ -273,8 +273,8 @@ int do_start_scheduling(message *m_ptr)
             assert(0);
 		rmp->time_slice = schedproc[parent_nr_n].time_slice;
 		break;
-		
-	default: 
+
+	default:
 		/* not reachable */
 		assert(0);
 	}
@@ -529,7 +529,7 @@ int lottery(void)
     int current;
     int ticketNum=0;
 
-    for (i=0,rmp=schedprc;i<NR_PROCS;i++,rmp++)
+    for (i=0,rmp=schedproc;i<NR_PROCS;i++,rmp++)
     {
         if ((rmp->flags&IN_USE)&&rmp->priority==MIN_USER_Q)
         {
@@ -546,7 +546,7 @@ int lottery(void)
     pick = random()%ticketNum;
     printf("The picked lottery is: %d, ticket number is: %d\n",pick,ticketNum);
     current=0;
-    for (i=0,rmp=schedprc;i<NR_PROCS;i++,rmp++)
+    for (i=0,rmp=schedproc;i<NR_PROCS;i++,rmp++)
     {
         if ((rmp->flags&IN_USE)&&rmp->priority==MIN_USER_Q)
         {
