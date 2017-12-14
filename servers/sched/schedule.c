@@ -12,8 +12,10 @@
 #include <assert.h>
 #include <minix/com.h>
 #include <machine/archtypes.h>
+#include <sys/resource.h>
 #include <time.h>
 #include <stdlib.h>
+#include <utility.c>
 #include "kernel/proc.h" /* for queue constants */
 
 #define SCHEDULE_ORIGIN 0
@@ -23,6 +25,7 @@ int schedule_type=SCHEDULE_LOTTERY;
 
 static timer_t sched_timer;
 static unsigned balance_timeout;
+static int currentTime=0;
 
 #define BALANCE_TIMEOUT	5 /* how often to balance queues in seconds */
 
@@ -129,6 +132,17 @@ int do_noquantum(message *m_ptr)
         }
         return lottery();
     }
+	else if (schedule_type==SCHEDULE_EDF)
+	{
+		if (rmp->priority <= MIN_USER_Q&&rmp->priority >= MAX_USER_Q) {
+			rmp->priority=MIN_USER_Q; /* lower priority */
+		}
+
+		if ((rv = schedule_process_local(rmp)) != OK) {
+			return rv;
+		}
+		return deadline();
+	}
     else
     {
         assert(0);
@@ -165,6 +179,8 @@ int do_stop_scheduling(message *m_ptr)
         return OK;
     else if (schedule_type==SCHEDULE_LOTTERY)
         return lottery();
+	else if (schedule_type==SCHEDULE_EDF)
+		return deadline();
     else
         assert(0);
 }
@@ -197,6 +213,7 @@ int do_start_scheduling(message *m_ptr)
 	rmp->parent       = m_ptr->SCHEDULING_PARENT;
 	rmp->max_priority = (unsigned) m_ptr->SCHEDULING_MAXPRIO;
     rmp->ticketNum=1;
+	rmp->deadline=-1;
 	if (rmp->max_priority >= NR_SCHED_QUEUES) {
 		return EINVAL;
 	}
@@ -232,6 +249,8 @@ int do_start_scheduling(message *m_ptr)
             rmp->priority=rmp->max_priority;
         else if (schedule_type==SCHEDULE_LOTTERY)
             rmp->priority=MIN_USER_Q;
+		else if (schedule_type==SCHEDULE_EDF)
+			rmp->priority=MIN_USER_Q;
         else
             assert(0);
 		rmp->time_slice = (unsigned) m_ptr->SCHEDULING_QUANTUM;
@@ -248,6 +267,8 @@ int do_start_scheduling(message *m_ptr)
             rmp->priority = schedproc[parent_nr_n].priority;
         else if (schedule_type==SCHEDULE_LOTTERY)
             rmp->priority=MIN_USER_Q;
+		else if (schedule_type==SCHEDULE_EDF)
+			rmp->priority=MIN_USER_Q;
         else
             assert(0);
 		rmp->time_slice = schedproc[parent_nr_n].time_slice;
@@ -302,6 +323,8 @@ int do_nice(message *m_ptr)
 	int rv;
 	int proc_nr_n;
 	unsigned new_q, old_q, old_max_q,old_ticketNum;
+	int old_deadline;
+	int nice;
 
 	/* check who can send you requests */
 	if (!accept_message(m_ptr))
@@ -314,9 +337,16 @@ int do_nice(message *m_ptr)
 	}
 
 	rmp = &schedproc[proc_nr_n];
-	new_q = (unsigned) m_ptr->SCHEDULING_MAXPRIO;
 	if (schedule_type==SCHEDULE_ORIGIN)
 	{
+		unsigned maxprio;
+		if (nice<PRIO_MIN)
+		{
+			schedule_type=SCHEDULE_LOTTERY;
+			printf("Successfully switched from SCHEDULE_ORIGIN to SCHEDULE_LOTTERY!\n");
+			return OK;
+		}
+		new_q=nice_to_priority(nice, &maxprio);
 		if (new_q >= NR_SCHED_QUEUES)
 		{
 			return EINVAL;
@@ -341,7 +371,13 @@ int do_nice(message *m_ptr)
 	}
 	else if (schedule_type==SCHEDULE_LOTTERY)
 	{
-		if (new_q >= NR_SCHED_QUEUES)
+		if (nice<PRIO_MIN)
+		{
+			schedule_type=SCHEDULE_EDF;
+			printf("Successfully switched from SCHEDULE_LOTTERY to SCHEDULE_EDF!\n");
+			return OK;
+		}
+		if (nice >= NR_SCHED_QUEUES)
 		{
 			return EINVAL;
 		}
@@ -350,7 +386,7 @@ int do_nice(message *m_ptr)
 		old_ticketNum=rmp->ticketNum;
 
 		/* Update the proc entry and reschedule the process */
-		rmp->ticketNum=new_q;
+		rmp->ticketNum=nice;
 
 		if ((rv = schedule_process_local(rmp)) != OK)
 		{
@@ -360,10 +396,44 @@ int do_nice(message *m_ptr)
 		}
 		else
 		{
-			printf("nice allocate process with %d tickects\n",new_q);
+			printf("nice allocate process with %d tickects\n",nice);
 		}
 
 		return lottery();
+
+	}
+	else if (schedule_type==SCHEDULE_EDF)
+	{
+		if (nice<PRIO_MIN)
+		{
+			schedule_type=SCHEDULE_ORIGIN;
+			printf("Successfully switched from SCHEDULE_EDF to SCHEDULE_ORIGIN!\n");
+			return OK;
+		}
+
+		if (nice >= NR_SCHED_QUEUES)
+		{
+			return EINVAL;
+		}
+
+		/* Stold_qore old values, in case we need to roll back the changes */
+		old_deadline=rmp->deadline;
+
+		/* Update the proc entry and reschedule the process */
+		rmp->deadline=currentTime+nice;
+
+		if ((rv = schedule_process_local(rmp)) != OK)
+		{
+			/* Something went wrong when rescheduling the process, roll
+             * back the changes to proc struct */
+			rmp->deadline=old_deadline;
+		}
+		else
+		{
+			printf("nice allocate process with %d deadline\n",rmp->deadline);
+		}
+
+		return deadline();
 
 	}
 	else
@@ -457,7 +527,6 @@ int lottery(void)
     int i;
     int pick;
     int current;
-    int flag=-1;
     int ticketNum=0;
 
     for (i=0,rmp=schedprc;i<NR_PROCS;i++,rmp++)
@@ -491,4 +560,41 @@ int lottery(void)
         }
     }
     return OK;
+}
+
+/*===========================================================================*
+ *				EDF_scheduling				     *
+ *===========================================================================*/
+
+int deadline(void)
+{
+	currentTime++;
+
+	struct schedproc *rmp,*rmpMin;
+	int i;
+	int min=0;
+	int flag=0;
+
+	for (i=0,rmp=schedprc;i<NR_PROCS;i++,rmp++)
+	{
+		if ((rmp->flags&IN_USE)&&rmp->priority=MIN_Q)
+		{
+			if (flag == 0)
+			{
+				min = rmp->deadline;
+				rmpMin = rmp;
+				flag = 1;
+			}
+			if (min > rmp->deadline)
+			{
+				min=rmp->deadline;
+				rmpMin=rmp;
+			}
+		}
+	}
+
+	printf("The deadline of choosen process is: %d\n",rmpMin->deadline);
+	rmpMin->priority=USER_Q;
+	schedule_process_local(rmpMin);
+	return OK;
 }

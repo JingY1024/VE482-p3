@@ -14,6 +14,7 @@ int do_stop_scheduling(message *m_ptr);
 int do_nice(message *m_ptr);
 void init_scheduling(void);
 int lottery(void);
+int deadline(void);
 void switch_schedule(void);
 
 /* utility.c */
