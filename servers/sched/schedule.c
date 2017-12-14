@@ -553,7 +553,7 @@ int lottery(void)
         if ((rmp->flags&IN_USE)&&rmp->priority==MIN_USER_Q)
         {
             current+=rmp->ticketNum;
-			
+
             if (current>pick)
             {
                 rmp->priority=USER_Q;
@@ -588,10 +588,15 @@ int deadline(void)
 				rmpMin = rmp;
 				flag = 1;
 			}
-			if (min > rmp->deadline)
+			if (rmpMin->deadline==-1&&rmp->deadline>-1)
 			{
-				min=rmp->deadline;
-				rmpMin=rmp;
+				min = rmp->deadline;
+				rmpMin = rmp;
+			}
+			if (min > rmp->deadline&&rmpMin->deadline!=-1)
+			{
+				min = rmp->deadline;
+				rmpMin = rmp;
 			}
 		}
 	}
