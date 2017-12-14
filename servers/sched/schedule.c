@@ -579,7 +579,7 @@ int deadline(void)
 
 	for (i=0,rmp=schedproc;i<NR_PROCS;i++,rmp++)
 	{
-		if ((rmp->flags&IN_USE)&&rmp->priority=MIN_USER_Q)
+		if ((rmp->flags&IN_USE)&&rmp->priority==MIN_USER_Q)
 		{
 			if (flag == 0)
 			{

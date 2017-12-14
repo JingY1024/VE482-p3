@@ -16,6 +16,7 @@ void init_scheduling(void);
 int lottery(void);
 int deadline(void);
 void switch_schedule(void);
+int nice_to_priority(int nice, unsigned* new_q);
 
 /* utility.c */
 int no_sys(int who_e, int call_nr);
