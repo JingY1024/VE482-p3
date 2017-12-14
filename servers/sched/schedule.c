@@ -323,7 +323,7 @@ int do_nice(message *m_ptr)
 	int proc_nr_n;
 	unsigned new_q, old_q, old_max_q,old_ticketNum;
 	int old_deadline;
-	int nice;
+	int nice=m_ptr->SCHEDULING_MAXPRIO;
 
 	/* check who can send you requests */
 	if (!accept_message(m_ptr))
@@ -576,7 +576,7 @@ int deadline(void)
 
 	for (i=0,rmp=schedproc;i<NR_PROCS;i++,rmp++)
 	{
-		if ((rmp->flags&IN_USE)&&rmp->priority=MIN_Q)
+		if ((rmp->flags&IN_USE)&&rmp->priority=MIN_USER_Q)
 		{
 			if (flag == 0)
 			{
