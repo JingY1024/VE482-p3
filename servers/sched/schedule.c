@@ -460,7 +460,7 @@ int lottery(void)
     int flag=-1;
     int ticketNum=0;
 
-    for (i=0,rmp=schedprc;i<NR_PROCS;i++,rmp++)
+    for (i=0,rmp=schedproc;i<NR_PROCS;i++,rmp++)
     {
         if ((rmp->flags&IN_USE)&&rmp->priority==MIN_USER_Q)
         {
