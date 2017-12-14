@@ -379,10 +379,6 @@ int do_nice(message *m_ptr)
 			printf("Successfully switched from SCHEDULE_LOTTERY to SCHEDULE_EDF!\n");
 			return OK;
 		}
-		if (nice >= NR_SCHED_QUEUES)
-		{
-			return EINVAL;
-		}
 
 		/* Stold_qore old values, in case we need to roll back the changes */
 		old_ticketNum=rmp->ticketNum;
@@ -411,11 +407,6 @@ int do_nice(message *m_ptr)
 			schedule_type=SCHEDULE_ORIGIN;
 			printf("Successfully switched from SCHEDULE_EDF to SCHEDULE_ORIGIN!\n");
 			return OK;
-		}
-
-		if (nice >= NR_SCHED_QUEUES)
-		{
-			return EINVAL;
 		}
 
 		/* Stold_qore old values, in case we need to roll back the changes */
