@@ -12,7 +12,14 @@
 #include <assert.h>
 #include <minix/com.h>
 #include <machine/archtypes.h>
+#include <time.h>
+#include <stdlib.h>
 #include "kernel/proc.h" /* for queue constants */
+
+#define SCHEDULE_ORIGIN 0
+#define SCHEDULE_LOTTERY 1
+#define SCHEDULE_EDF 2
+int schedule_type=SCHEDULE_LOTTERY;
 
 static timer_t sched_timer;
 static unsigned balance_timeout;
@@ -99,14 +106,35 @@ int do_noquantum(message *m_ptr)
 	}
 
 	rmp = &schedproc[proc_nr_n];
-	if (rmp->priority < MIN_USER_Q) {
-		rmp->priority += 1; /* lower priority */
-	}
 
-	if ((rv = schedule_process_local(rmp)) != OK) {
-		return rv;
-	}
-	return OK;
+    if (schedule_type==SCHEDULE_ORIGIN)
+    {
+        if (rmp->priority < MIN_USER_Q) {
+            rmp->priority += 1; /* lower priority */
+        }
+
+        if ((rv = schedule_process_local(rmp)) != OK) {
+            return rv;
+        }
+        return OK;
+    }
+    else if (schedule_type==SCHEDULE_LOTTERY)
+    {
+        if (rmp->priority <= MIN_USER_Q&&rmp->priority >= MAX_USER_Q) {
+            rmp->priority=MIN_USER_Q; /* lower priority */
+        }
+
+        if ((rv = schedule_process_local(rmp)) != OK) {
+            return rv;
+        }
+        return lottery();
+    }
+    else
+    {
+        assert(0);
+    }
+
+
 }
 
 /*===========================================================================*
@@ -133,7 +161,12 @@ int do_stop_scheduling(message *m_ptr)
 #endif
 	rmp->flags = 0; /*&= ~IN_USE;*/
 
-	return OK;
+	if (schedule_type==SCHEDULE_ORIGIN)
+        return OK;
+    else if (schedule_type==SCHEDULE_LOTTERY)
+        return lottery();
+    else
+        assert(0);
 }
 
 /*===========================================================================*
@@ -163,6 +196,7 @@ int do_start_scheduling(message *m_ptr)
 	rmp->endpoint     = m_ptr->SCHEDULING_ENDPOINT;
 	rmp->parent       = m_ptr->SCHEDULING_PARENT;
 	rmp->max_priority = (unsigned) m_ptr->SCHEDULING_MAXPRIO;
+    rmp->ticketNum=1;
 	if (rmp->max_priority >= NR_SCHED_QUEUES) {
 		return EINVAL;
 	}
@@ -194,7 +228,12 @@ int do_start_scheduling(message *m_ptr)
 		/* We have a special case here for system processes, for which
 		 * quanum and priority are set explicitly rather than inherited 
 		 * from the parent */
-		rmp->priority   = rmp->max_priority;
+		if (schedule_type==SCHEDULE_ORIGIN)
+            rmp->priority=rmp->max_priority;
+        else if (schedule_type==SCHEDULE_LOTTERY)
+            rmp->priority=MIN_USER_Q;
+        else
+            assert(0);
 		rmp->time_slice = (unsigned) m_ptr->SCHEDULING_QUANTUM;
 		break;
 		
@@ -205,8 +244,12 @@ int do_start_scheduling(message *m_ptr)
 		if ((rv = sched_isokendpt(m_ptr->SCHEDULING_PARENT,
 				&parent_nr_n)) != OK)
 			return rv;
-
-		rmp->priority = schedproc[parent_nr_n].priority;
+        if (schedule_type==SCHEDULE_ORIGIN)
+            rmp->priority = schedproc[parent_nr_n].priority;
+        else if (schedule_type==SCHEDULE_LOTTERY)
+            rmp->priority=MIN_USER_Q;
+        else
+            assert(0);
 		rmp->time_slice = schedproc[parent_nr_n].time_slice;
 		break;
 		
@@ -363,4 +406,50 @@ static void balance_queues(struct timer *tp)
 	}
 
 	set_timer(&sched_timer, balance_timeout, balance_queues, 0);
+}
+
+/*===========================================================================*
+ *				lottery_scheduling				     *
+ *===========================================================================*/
+
+int lottery(void)
+{
+    struct schedproc *rmp;
+    int i;
+    int pick;
+    int current;
+    int flag=-1;
+    int ticketNum=0;
+
+    for (i=0,rmp=schedprc;i<NR_PROCS;i++,rmp++)
+    {
+        if ((rmp->flags&IN_USE)&&rmp->priority==MIN_USER_Q)
+        {
+                ticketNum+=rmp->ticketNum;
+        }
+    }
+
+    if (!ticketNum)
+    {
+        printf("ticket number: %d\n",ticketNum);
+        return OK;
+    }
+
+    pick = random()%ticketNum;
+    printf("The picked lottery is: %d, ticket number is: %d\n",pick,ticketNum);
+    current=0;
+    for (i=0,rmp=schedprc;i<NR_PROCS;i++,rmp++)
+    {
+        if ((rmp->flags&IN_USE)&&rmp->priority==MIN_USER_Q)
+        {
+            current+=rmp->ticketNum;
+            if (current>=pick)
+            {
+                rmp->priority=USER_Q;
+                schedule_process_local(rmp);
+                return OK;
+            }
+        }
+    }
+    return OK;
 }
