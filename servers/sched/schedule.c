@@ -587,16 +587,19 @@ int deadline(void)
 				min = rmp->deadline;
 				rmpMin = rmp;
 				flag = 1;
+				continue;
 			}
 			if (rmpMin->deadline==-1&&rmp->deadline>-1)
 			{
 				min = rmp->deadline;
 				rmpMin = rmp;
+				continue;
 			}
 			if (min > rmp->deadline&&rmpMin->deadline!=-1)
 			{
 				min = rmp->deadline;
 				rmpMin = rmp;
+				continue;
 			}
 		}
 	}
