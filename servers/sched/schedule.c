@@ -301,7 +301,7 @@ int do_nice(message *m_ptr)
 	struct schedproc *rmp;
 	int rv;
 	int proc_nr_n;
-	unsigned new_q, old_q, old_max_q;
+	unsigned new_q, old_q, old_max_q,old_ticketNum;
 
 	/* check who can send you requests */
 	if (!accept_message(m_ptr))
@@ -315,25 +315,59 @@ int do_nice(message *m_ptr)
 
 	rmp = &schedproc[proc_nr_n];
 	new_q = (unsigned) m_ptr->SCHEDULING_MAXPRIO;
-	if (new_q >= NR_SCHED_QUEUES) {
-		return EINVAL;
+	if (schedule_type==SCHEDULE_ORIGIN)
+	{
+		if (new_q >= NR_SCHED_QUEUES)
+		{
+			return EINVAL;
+		}
+
+		/* Store old values, in case we need to roll back the changes */
+		old_q = rmp->priority;
+		old_max_q = rmp->max_priority;
+
+		/* Update the proc entry and reschedule the process */
+		rmp->max_priority = rmp->priority = new_q;
+
+		if ((rv = schedule_process_local(rmp)) != OK)
+		{
+			/* Something went wrong when rescheduling the process, roll
+             * back the changes to proc struct */
+			rmp->priority = old_q;
+			rmp->max_priority = old_max_q;
+		}
+
+		return rv;
 	}
+	else if (schedule_type==SCHEDULE_LOTTERY)
+	{
+		if (new_q >= NR_SCHED_QUEUES)
+		{
+			return EINVAL;
+		}
 
-	/* Store old values, in case we need to roll back the changes */
-	old_q     = rmp->priority;
-	old_max_q = rmp->max_priority;
+		/* Stold_qore old values, in case we need to roll back the changes */
+		old_ticketNum=rmp->ticketNum;
 
-	/* Update the proc entry and reschedule the process */
-	rmp->max_priority = rmp->priority = new_q;
+		/* Update the proc entry and reschedule the process */
+		rmp->ticketNum=new_q;
 
-	if ((rv = schedule_process_local(rmp)) != OK) {
-		/* Something went wrong when rescheduling the process, roll
-		 * back the changes to proc struct */
-		rmp->priority     = old_q;
-		rmp->max_priority = old_max_q;
+		if ((rv = schedule_process_local(rmp)) != OK)
+		{
+			/* Something went wrong when rescheduling the process, roll
+             * back the changes to proc struct */
+			rmp->ticketNum=old_ticketNum;
+		}
+		else
+		{
+			printf("nice allocate process with %d tickects\n",new_q);
+		}
+
+		return lottery();
+
 	}
-
-	return rv;
+	else
+		assert(0);
 }
 
 /*===========================================================================*
