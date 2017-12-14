@@ -553,6 +553,7 @@ int lottery(void)
         if ((rmp->flags&IN_USE)&&rmp->priority==MIN_USER_Q)
         {
             current+=rmp->ticketNum;
+			
             if (current>pick)
             {
                 rmp->priority=USER_Q;
