@@ -572,7 +572,7 @@ int deadline(void)
 {
 	currentTime++;
 
-	struct schedproc *rmp,*rmpMin;
+	struct schedproc *rmp,*rmpMin=0;
 	int i;
 	int min=0;
 	int flag=0;
@@ -595,9 +595,12 @@ int deadline(void)
 		}
 	}
 
-	printf("The deadline of choosen process is: %d\n",rmpMin->deadline);
-	rmpMin->priority=USER_Q;
-	schedule_process_local(rmpMin);
+	if (rmpMin)
+	{
+		printf("The deadline of choosen process is: %d\n", rmpMin->deadline);
+		rmpMin->priority = USER_Q;
+		schedule_process_local(rmpMin);
+	}
 	return OK;
 }
 
