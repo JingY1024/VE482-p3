@@ -530,8 +530,14 @@ int lottery(void)
         }
     }
 
+    if (!ticketNum)
+    {
+        printf("ticket number: %d\n",ticketNum);
+        return OK;
+    }
+
     pick = random()%ticketNum;
-    printf("Lottery picked: %d; Total lottery: %d\n",pick,ticketNum);
+    printf("The picked lottery is: %d, ticket number is: %d\n",pick,ticketNum);
     current=0;
     for (i=0,rmp=schedproc;i<NR_PROCS;i++,rmp++)
     {
