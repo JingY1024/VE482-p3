@@ -414,7 +414,6 @@ int do_nice(message *m_ptr)
 
 		/* Update the proc entry and reschedule the process */
 		rmp->deadline=currentTime+nice;
-        printf("The Deadline is: %d",rmp->deadline);
 
 		if ((rv = schedule_process_local(rmp)) != OK)
 		{
@@ -531,14 +530,8 @@ int lottery(void)
         }
     }
 
-    if (!ticketNum)
-    {
-        printf("ticket number: %d\n",ticketNum);
-        return OK;
-    }
-
     pick = random()%ticketNum;
-    printf("The picked lottery is: %d, ticket number is: %d\n",pick,ticketNum);
+    printf("Lottery picked: %d; Total lottery: %d\n",pick,ticketNum);
     current=0;
     for (i=0,rmp=schedproc;i<NR_PROCS;i++,rmp++)
     {
